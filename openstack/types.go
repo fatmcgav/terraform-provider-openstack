@@ -153,6 +153,12 @@ func (lrt *LogRoundTripper) formatJSON(raw []byte) string {
 	return string(pretty)
 }
 
+type VendorOption string
+
+const (
+	SetRouterGatewayOnUpdate VendorOption = "set_router_gateway_on_update"
+)
+
 // Firewall is an OpenStack firewall.
 type Firewall struct {
 	firewalls.Firewall

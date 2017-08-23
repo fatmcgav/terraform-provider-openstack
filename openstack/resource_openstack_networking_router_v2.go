@@ -12,6 +12,10 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 )
 
+var vendorOptions = map[VendorOption]string{
+	VendorOption.SetRouterGatewayOnUpdate: "set_router_gateway_on_update",
+}
+
 func resourceNetworkingRouterV2() *schema.Resource {
 	return &schema.Resource{
 		Create: resourceNetworkingRouterV2Create,
@@ -64,6 +68,10 @@ func resourceNetworkingRouterV2() *schema.Resource {
 				Optional: true,
 				ForceNew: true,
 			},
+			"vendor_options": &schema.Schema{
+				Type:     schema.TypeMap,
+				Optional: true,
+			},
 		},
 	}
 }
@@ -92,6 +100,18 @@ func resourceNetworkingRouterV2Create(d *schema.ResourceData, meta interface{}) 
 		d := dRaw.(bool)
 		createOpts.Distributed = &d
 	}
+
+	// Build the user options
+	options := map[VendorOption]interface{}{}
+	log.Printf("[DEBUG] vendorOptions looks like: %+v", vendorOptions)
+	for optionType, option := range vendorOptions {
+		log.Printf("[DEBUG] Looking for option %+v of type %+v", option, optionType)
+		if v, ok := d.GetOk(option); ok {
+			log.Printf("[DEBUG] Got a matching option:  %+v", v)
+			options[optionType] = v.(bool)
+		}
+	}
+	log.Printf("[DEBUG] Options = %+v", options)
 
 	externalGateway := d.Get("external_gateway").(string)
 	if externalGateway != "" {
