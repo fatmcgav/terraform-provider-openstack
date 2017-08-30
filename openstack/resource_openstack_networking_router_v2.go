@@ -133,7 +133,8 @@ func resourceNetworkingRouterV2Create(d *schema.ResourceData, meta interface{}) 
 			NetworkID: externalGateway,
 		}
 
-		if options["set_router_gateway_on_update"] {
+		// if options["set_router_gateway_on_update"] {
+		if options[SetRouterGatewayOnUpdate] {
 			log.Printf("[DEBUG] Setting router gateway on update")
 			updateGateway = true
 		} else {
