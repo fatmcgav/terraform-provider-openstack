@@ -35,6 +35,26 @@ func TestAccNetworkingV2Router_basic(t *testing.T) {
 	})
 }
 
+func TestAccNetworkingV2Router_vendor_opts(t *testing.T) {
+	var router routers.Router
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckNetworkingV2RouterDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccNetworkingV2Router_vendor_opts,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckNetworkingV2RouterExists("openstack_networking_router_v2.router_1", &router),
+					resource.TestCheckResourceAttr(
+						"openstack_networking_router_v2.router_1", "external_gateway", OS_EXTGW_ID),
+				),
+			},
+		},
+	})
+}
+
 func TestAccNetworkingV2Router_update_external_gw(t *testing.T) {
 	var router routers.Router
 
@@ -138,6 +158,18 @@ resource "openstack_networking_router_v2" "router_1" {
 	distributed = "false"
 }
 `
+
+var testAccNetworkingV2Router_vendor_opts = fmt.Sprintf(`
+resource "openstack_networking_router_v2" "router_1" {
+	name = "router_1"
+	admin_state_up = "true"
+	distributed = "false"
+	external_gateway = "%s"
+	vendor_options {
+		"set_router_gateway_on_update" = true
+	}
+}
+`, OS_EXTGW_ID)
 
 const testAccNetworkingV2Router_update = `
 resource "openstack_networking_router_v2" "router_1" {

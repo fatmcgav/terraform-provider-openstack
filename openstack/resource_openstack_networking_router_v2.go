@@ -3,6 +3,7 @@ package openstack
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/hashicorp/terraform/helper/resource"
@@ -12,8 +13,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 )
 
-var vendorOptions = map[VendorOption]string{
-	VendorOption.SetRouterGatewayOnUpdate: "set_router_gateway_on_update",
+var supportedVendorOptions = map[VendorOption]string{
+	SetRouterGatewayOnUpdate: "set_router_gateway_on_update",
 }
 
 func resourceNetworkingRouterV2() *schema.Resource {
@@ -101,24 +102,44 @@ func resourceNetworkingRouterV2Create(d *schema.ResourceData, meta interface{}) 
 		createOpts.Distributed = &d
 	}
 
-	// Build the user options
-	options := map[VendorOption]interface{}{}
-	log.Printf("[DEBUG] vendorOptions looks like: %+v", vendorOptions)
-	for optionType, option := range vendorOptions {
+	// Build the vendor options
+	options := map[VendorOption]bool{}
+	log.Printf("[DEBUG] options looks like: %+v", options)
+
+	// Get provided vendor_options
+	vendor_options := d.Get("vendor_options").(map[string]interface{})
+	log.Printf("[DEBUG] vendor_options looks like: %+v", vendor_options)
+
+	log.Printf("[DEBUG] supportedVendorOptions looks like: %+v", supportedVendorOptions)
+	for optionType, option := range supportedVendorOptions {
 		log.Printf("[DEBUG] Looking for option %+v of type %+v", option, optionType)
-		if v, ok := d.GetOk(option); ok {
-			log.Printf("[DEBUG] Got a matching option:  %+v", v)
-			options[optionType] = v.(bool)
+		if valRaw, ok := vendor_options[option]; ok {
+			val, err := strconv.ParseBool(valRaw.(string))
+			if err != nil {
+				return fmt.Errorf("Error parsing valRaw: %s", err)
+			}
+			log.Printf("[DEBUG] Got a matching option:  %+v, type = %T", val, val)
+			options[optionType] = val
 		}
 	}
 	log.Printf("[DEBUG] Options = %+v", options)
 
 	externalGateway := d.Get("external_gateway").(string)
+	// Update flag
+	updateGateway := false
+
 	if externalGateway != "" {
 		gatewayInfo := routers.GatewayInfo{
 			NetworkID: externalGateway,
 		}
-		createOpts.GatewayInfo = &gatewayInfo
+
+		if options["set_router_gateway_on_update"] {
+			log.Printf("[DEBUG] Setting router gateway on update")
+			updateGateway = true
+		} else {
+			log.Printf("[DEBUG] Setting router gateway on creation")
+			createOpts.GatewayInfo = &gatewayInfo
+		}
 	}
 
 	log.Printf("[DEBUG] Create Options: %#v", createOpts)
@@ -141,6 +162,22 @@ func resourceNetworkingRouterV2Create(d *schema.ResourceData, meta interface{}) 
 	_, err = stateConf.WaitForState()
 
 	d.SetId(n.ID)
+
+	// Set Router Gateway on update
+	if updateGateway {
+		log.Printf("[DEBUG] Updating Router Gateway for Router %s", d.Id())
+		var updateOpts routers.UpdateOpts
+		gatewayInfo := routers.GatewayInfo{
+			NetworkID: externalGateway,
+		}
+		updateOpts.GatewayInfo = &gatewayInfo
+
+		log.Printf("[DEBUG] Assigning external gateway to Router %s with options: %+v", d.Id(), updateOpts)
+		_, err = routers.Update(networkingClient, d.Id(), updateOpts).Extract()
+		if err != nil {
+			return fmt.Errorf("Error updating OpenStack Neutron Router: %s", err)
+		}
+	}
 
 	return resourceNetworkingRouterV2Read(d, meta)
 }
