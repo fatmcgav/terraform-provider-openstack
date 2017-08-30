@@ -125,9 +125,6 @@ func resourceNetworkingRouterV2Create(d *schema.ResourceData, meta interface{}) 
 	log.Printf("[DEBUG] Options = %+v", options)
 
 	externalGateway := d.Get("external_gateway").(string)
-	// Update flag
-	updateGateway := false
-
 	if externalGateway != "" {
 		gatewayInfo := routers.GatewayInfo{
 			NetworkID: externalGateway,
@@ -136,7 +133,6 @@ func resourceNetworkingRouterV2Create(d *schema.ResourceData, meta interface{}) 
 		// if options["set_router_gateway_on_update"] {
 		if options[SetRouterGatewayOnUpdate] {
 			log.Printf("[DEBUG] Setting router gateway on update")
-			updateGateway = true
 		} else {
 			log.Printf("[DEBUG] Setting router gateway on creation")
 			createOpts.GatewayInfo = &gatewayInfo
@@ -165,7 +161,7 @@ func resourceNetworkingRouterV2Create(d *schema.ResourceData, meta interface{}) 
 	d.SetId(n.ID)
 
 	// Set Router Gateway on update
-	if updateGateway {
+	if options[SetRouterGatewayOnUpdate] {
 		log.Printf("[DEBUG] Updating Router Gateway for Router %s", d.Id())
 		var updateOpts routers.UpdateOpts
 		gatewayInfo := routers.GatewayInfo{
